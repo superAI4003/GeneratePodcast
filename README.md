@@ -69,8 +69,7 @@
 
 5. Create a `.env` file in the `backend` directory and add the following:
 
-   ```env
-   ELEVENLABS_API_KEY= 
+   ```env 
    GOOGLE_APPLICATION_CREDENTIALS=D:\Current Project\credential\gcp.json
    ```
 
