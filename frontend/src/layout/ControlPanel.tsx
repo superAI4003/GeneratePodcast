@@ -3,16 +3,23 @@ import TitleFileUpload from "../components/conotrolpanel/TitleFileUpload";
 import ReactLoading from "react-loading";
 import { categories, categoryNames, standardprompt } from "../data/const";
 import { Context, ProcessingStatus } from "../ContextProvider";
-import OpenAI from "openai"; 
+import OpenAI from "openai";
 
 function ControlPanel() {
   const context = useContext(Context);
   if (!context) {
     throw new Error("ControlPanel must be used within a ContextProvider");
   }
-  const { setGeneratedContent,titles,setCurrentProcessingIndex,generatedContent, setCurrentProcessingStatus, currentProcessingStatus } = context;
+  const {
+    setGeneratedContent,
+    titles,
+    setCurrentProcessingIndex,
+    generatedContent,
+    setCurrentProcessingStatus,
+    currentProcessingStatus,
+  } = context;
   const [isPageLoading, setIsPageLoading] = useState(false);
-  const [isUploaded, setIsUploaded] = useState(false); 
+  const [isUploaded, setIsUploaded] = useState(false);
   const [prompt, setPrompt] = useState(standardprompt);
   const [currentSpeaker, setCurrentSpeaker] = useState({
     //current state speaker
@@ -63,22 +70,24 @@ function ControlPanel() {
     fetchData();
   }, []);
 
-  const generateImage = async(title:string)=>{
-    
+  const generateImage = async (title: string) => {
     const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY;
 
-    const openai = new OpenAI({apiKey: OPENAI_API_KEY, dangerouslyAllowBrowser: true});
+    const openai = new OpenAI({
+      apiKey: OPENAI_API_KEY,
+      dangerouslyAllowBrowser: true,
+    });
 
     const response = await openai.images.generate({
       model: "dall-e-3",
-      prompt: "cover of book:"+title,
+      prompt: "cover of book:" + title,
       n: 1,
       size: "1024x1024",
-       response_format: "b64_json"
+      response_format: "b64_json",
     });
-     
+
     return response.data[0].b64_json;
-  }
+  };
 
   const generateDescription = async (title: string) => {
     try {
@@ -171,33 +180,46 @@ function ControlPanel() {
     }
   };
 
-  const generateAudio=async(script:any)=>{
+  const generateAudio = async (script: any) => {
     const formData = new FormData();
-      formData.append("currentSpeaker", JSON.stringify(currentSpeaker));
-      formData.append("id", "a1");
-      formData.append("conversation", JSON.stringify(script));
-      const response = await fetch(
-        `${ import.meta.env.VITE_BACKEND_URL}/generate-audio`,
-        {
-          method: "POST",
-          body: formData, // Always send formData
-          headers: undefined, // No need for Content-Type header with FormData
-        }
-      );
-      const blob = await response.blob();
-      const audioUrl = URL.createObjectURL(blob);
-      return audioUrl;  
-  }
+    formData.append("currentSpeaker", JSON.stringify(currentSpeaker));
+    formData.append("id", "a1");
+    formData.append("conversation", JSON.stringify(script));
+    const response = await fetch(
+      `${import.meta.env.VITE_BACKEND_URL}/generate-audio`,
+      {
+        method: "POST",
+        body: formData, // Always send formData
+        headers: undefined, // No need for Content-Type header with FormData
+      }
+    );
+    const blob = await response.blob();
+    const audioUrl = URL.createObjectURL(blob);
+    return audioUrl;
+  };
+
+  const retryAsync = async (fn:any, args:any, retries = 3) => {
+    for (let attempt = 0; attempt < retries; attempt++) {
+      try {
+        return await fn(...args);
+      } catch (error) {
+        console.error(`Error on attempt ${attempt + 1}:`, error);
+        if (attempt === retries - 1) throw error; // Rethrow if last attempt
+      }
+    }
+  };
+
   const handleGenerate = async () => {
     setCurrentProcessingStatus(ProcessingStatus.GenLoading);
     if (titles) {
       for (const title of titles) {
-        const description = await generateDescription(title);
-        const author = await generateAuthor(title);
-        const categoryID = await selectCategory(title, categoryNames);
-        const script = await generateScripts(title);
-        const audioUrl = await generateAudio(script);
-        const  imageUrl =  await generateImage(title);
+        const description = await retryAsync(generateDescription, [title]);
+        const author = await retryAsync(generateAuthor, [title]);
+        const categoryID = await retryAsync(selectCategory, [title, categoryNames]);
+        const script = await retryAsync(generateScripts, [title]);
+        const audioUrl = await retryAsync(generateAudio, [script]);
+        const imageUrl = await retryAsync(generateImage, [title]);
+
         const newContentItem = {
           title,
           description,
@@ -205,18 +227,17 @@ function ControlPanel() {
           categoryID,
           converScript: script,
           audioURL: audioUrl,
-          imageUrl
+          imageUrl,
         };
         setGeneratedContent((prevContent: any) =>
           prevContent ? [...prevContent, newContentItem] : [newContentItem]
-        ); 
+        );
         setCurrentProcessingIndex((prevIndex) => {
           const newIndex = prevIndex + 1;
-        
+
           return newIndex;
-      });
+        });
       }
-      
     }
     setCurrentProcessingIndex(0);
     setCurrentProcessingStatus(ProcessingStatus.NoAction);
@@ -231,7 +252,7 @@ function ControlPanel() {
       const uploadPodcastUrl = `${serverUrl}/Service.php?Service=uploadPodcast&show_error=ture`;
 
       const appSecret = "BookClubLm@1210#";
-  
+
       const loginHeaders = {
         "Content-Type": "application/json",
         "User-Agent": appSecret,
@@ -241,20 +262,20 @@ function ControlPanel() {
         "App-Store-Version": "1.1",
         "App-Device-Model": "iPhone 8",
         "App-Os-Version": "iOS 11",
-        "App-Store-Build-Number": "1.1"
+        "App-Store-Build-Number": "1.1",
       };
-  
+
       const loginPayload = {
         email: "dipak@yopmail.com",
-        password: "123456"
+        password: "123456",
       };
-  
+
       const response = await fetch(loginUrl, {
         method: "POST",
         headers: loginHeaders,
-        body: JSON.stringify(loginPayload)
+        body: JSON.stringify(loginPayload),
       });
-      let authToken = '';
+      let authToken = "";
 
       if (response.ok) {
         const responseBody = await response.json();
@@ -264,74 +285,70 @@ function ControlPanel() {
       } else {
         console.error(`Request failed with status code ${response.status}`);
       }
- 
-    
-    const uploadHeaders = {
-      "User-Agent": appSecret,
-      "App-Secret": appSecret,
-      "App-Track-Version": "v1",
-      "App-Device-Type": "ios",
-      "App-Store-Version": "1.1",
-      "App-Device-Model": "iPhone 8",
-      "App-Os-Version": "iOS 11",
-      "App-Store-Build-Number": "1.1",
-      "Auth-Token": authToken,
-    }; 
-    const formData = new FormData();
 
-    if (generatedContent && generatedContent.length > 0) { 
+      const uploadHeaders = {
+        "User-Agent": appSecret,
+        "App-Secret": appSecret,
+        "App-Track-Version": "v1",
+        "App-Device-Type": "ios",
+        "App-Store-Version": "1.1",
+        "App-Device-Model": "iPhone 8",
+        "App-Os-Version": "iOS 11",
+        "App-Store-Build-Number": "1.1",
+        "Auth-Token": authToken,
+      };
+      const formData = new FormData();
 
-      for (const genContent of generatedContent) {
-      const imageBlob = await fetch(`data:image/png;base64,${genContent.imageUrl}`).then(res => res.blob());
-    
-      const audioResponse = await fetch(genContent.audioURL);
-      const audioBlob = await audioResponse.blob();
-      
-      const audioUrl = URL.createObjectURL(audioBlob);
-      const audioElement = new Audio(audioUrl);
+      if (generatedContent && generatedContent.length > 0) {
+        for (const genContent of generatedContent) {
+          
+          const imageBlob = await fetch(
+            `data:image/png;base64,${genContent.imageUrl}`
+          ).then((res) => res.blob());
+          const audioResponse = await fetch(genContent.audioURL);
+          const audioBlob = await audioResponse.blob();
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audioElement = new Audio(audioUrl);
 
-      // Wait for the audio metadata to load to get the duration
-      await new Promise((resolve) => {
-        audioElement.addEventListener('loadedmetadata', () => {
-          resolve(audioElement.duration);
-        });
-      });
+          // Wait for the audio metadata to load to get the duration
+          await new Promise((resolve) => {
+            audioElement.addEventListener("loadedmetadata", () => {
+              resolve(audioElement.duration);
+            });
+          });
 
-      const audioDuration = Math.floor(audioElement.duration); 
-      formData.append('podcast_file', audioBlob, 'audio.mp3'); // Append audio blob
-      formData.append('podcast_image', imageBlob, 'image.png');
-      formData.append('podcast_name', genContent.title);
-      formData.append('category_id', genContent.categoryID.toString());
-      formData.append('auther', genContent.author);
-      formData.append('length_in_sec', audioDuration.toString());
-      formData.append('podcast_description', genContent.description);
-      setCurrentProcessingIndex((prevIndex) => {
-        const newIndex = prevIndex + 1;
-      
-        return newIndex;
-    });
+          const audioDuration = Math.floor(audioElement.duration);
+          formData.append("podcast_file", audioBlob, "audio.mp3"); // Append audio blob
+          formData.append("podcast_image", imageBlob, "image.png");
+          formData.append("podcast_name", genContent.title);
+          formData.append("category_id", genContent.categoryID.toString());
+          formData.append("auther", genContent.author);
+          formData.append("length_in_sec", audioDuration.toString());
+          formData.append("podcast_description", genContent.description);
+          
+          const uploadresponse = await fetch(uploadPodcastUrl, {
+            method: "POST",
+            headers: uploadHeaders,
+            body: formData,
+          });
+          const responseBody = await uploadresponse.json();
+          console.log(responseBody);
+
+          if (response.ok) {
+            console.log("Podcast uploaded successfully.");
+          } else {
+            console.error(`Upload failed with status code ${response.status}`);
+          }
+          setCurrentProcessingIndex((prevIndex) => {
+            const newIndex = prevIndex + 1;
+            return newIndex;
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error during upload:", error);
     }
-
-
-    const uploadresponse = await fetch(uploadPodcastUrl, {
-      method: "POST",
-      headers: uploadHeaders,
-      body: formData,
-    });
-
-    const responseBody = await uploadresponse.json();
-    console.log(responseBody);
-
-    if (response.ok) {
-      console.log("Podcast uploaded successfully.");
-    } else {
-      console.error(`Upload failed with status code ${response.status}`);
-    }
-  }
-  } catch (error) {
-    console.error("Error during upload:", error);
-  }
-  setCurrentProcessingStatus(ProcessingStatus.NoAction);
+    setCurrentProcessingStatus(ProcessingStatus.NoAction);
   };
 
   return (
@@ -343,8 +360,8 @@ function ControlPanel() {
           <TitleFileUpload setIsUploaded={setIsUploaded} />
           <textarea
             value={prompt}
-            id= "prompt"
-            name = "prompt"
+            id="prompt"
+            name="prompt"
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Enter your prompt here"
             className="w-full p-2 border rounded"
@@ -380,12 +397,11 @@ function ControlPanel() {
                 }
                 value={currentSpeaker.person1}
               >
-                { voiceList.map((voice) => (
-                      <option key={voice} value={voice}>
-                        {voice}
-                      </option>
-                    ))
-                   }
+                {voiceList.map((voice) => (
+                  <option key={voice} value={voice}>
+                    {voice}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="flex-1">
@@ -418,19 +434,21 @@ function ControlPanel() {
                 }
                 value={currentSpeaker.person2}
               >
-                {  voiceList.map((voice) => (
-                      <option key={voice} value={voice}>
-                        {voice}
-                      </option>
-                    ))
-                   }
+                {voiceList.map((voice) => (
+                  <option key={voice} value={voice}>
+                    {voice}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
           <button
             onClick={handleGenerate}
             className=" flex items-center justify-center gap-2 bg-gray-700 w-full rounded-lg py-3 text-white hover:bg-gray-600  disabled:bg-slate-400"
-            disabled={!isUploaded || currentProcessingStatus == ProcessingStatus.GenLoading}
+            disabled={
+              !isUploaded ||
+              currentProcessingStatus == ProcessingStatus.GenLoading
+            }
           >
             {currentProcessingStatus == ProcessingStatus.GenLoading && (
               <ReactLoading
@@ -445,15 +463,19 @@ function ControlPanel() {
           <button
             className=" flex items-center justify-center gap-2 bg-gray-700 w-full rounded-lg py-3 text-white hover:bg-gray-600  disabled:bg-slate-400"
             onClick={handleSubmit}
-            disabled={(generatedContent?.length ?? 0) <= 0 || currentProcessingStatus == ProcessingStatus.SubmittingLoading}
-          >{currentProcessingStatus == ProcessingStatus.SubmittingLoading && (
-            <ReactLoading
-              type="spin"
-              color="#000000"
-              height={20}
-              width={20}
-            />
-          )}
+            disabled={
+              (generatedContent?.length ?? 0) <= 0 ||
+              currentProcessingStatus == ProcessingStatus.SubmittingLoading
+            }
+          >
+            {currentProcessingStatus == ProcessingStatus.SubmittingLoading && (
+              <ReactLoading
+                type="spin"
+                color="#000000"
+                height={20}
+                width={20}
+              />
+            )}
             Submmit
           </button>
         </div>
