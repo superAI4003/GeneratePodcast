@@ -213,25 +213,43 @@ function ControlPanel() {
     setCurrentProcessingStatus(ProcessingStatus.GenLoading);
     if (titles) {
       for (const title of titles) {
-        const description = await retryAsync(generateDescription, [title]);
-        const author = await retryAsync(generateAuthor, [title]);
-        const categoryID = await retryAsync(selectCategory, [title, categoryNames]);
-        const script = await retryAsync(generateScripts, [title]);
-        const audioUrl = await retryAsync(generateAudio, [script]);
-        const imageUrl = await retryAsync(generateImage, [title]);
+        let success = false;
+        let attempts = 0;
+        const maxAttempts = 3;
 
-        const newContentItem = {
-          title,
-          description,
-          author,
-          categoryID,
-          converScript: script,
-          audioURL: audioUrl,
-          imageUrl,
-        };
-        setGeneratedContent((prevContent: any) =>
-          prevContent ? [...prevContent, newContentItem] : [newContentItem]
-        );
+        while (!success && attempts < maxAttempts) {
+          try {
+            const description = await generateDescription(title);
+            const author = await generateAuthor(title);
+            const categoryID = await selectCategory(title, categoryNames);
+            const script = await generateScripts(title);
+            const audioUrl = await generateAudio(script);
+            const imageUrl = await generateImage(title);
+
+            const newContentItem = {
+              title,
+              description,
+              author,
+              categoryID,
+              converScript: script,
+              audioURL: audioUrl,
+              imageUrl,
+            };
+
+            setGeneratedContent((prevContent: any) =>
+              prevContent ? [...prevContent, newContentItem] : [newContentItem]
+            );
+
+            success = true; // If all steps succeed, mark as successful
+          } catch (error) {
+            console.error(`Error during generation attempt ${attempts + 1}:`, error);
+            attempts += 1; // Increment the attempt counter
+            if (attempts >= maxAttempts) {
+              console.error("Max attempts reached. Skipping this title.");
+            }
+          }
+        }
+       
         setCurrentProcessingIndex((prevIndex) => {
           const newIndex = prevIndex + 1;
 
