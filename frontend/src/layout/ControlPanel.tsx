@@ -198,16 +198,20 @@ function ControlPanel() {
     return audioUrl;
   };
 
-  const retryAsync = async (fn:any, args:any, retries = 3) => {
-    for (let attempt = 0; attempt < retries; attempt++) {
-      try {
-        return await fn(...args);
-      } catch (error) {
-        console.error(`Error on attempt ${attempt + 1}:`, error);
-        if (attempt === retries - 1) throw error; // Rethrow if last attempt
-      }
-    }
-  };
+  // const retryAsync = async (fn:any, args:any, retries = 3) => {
+  //   for (let attempt = 0; attempt < retries; attempt++) {
+  //     try {
+  //       return await fn(...args);
+  //     } catch (error) {
+  //       console.error(`Error on attempt ${attempt + 1}:`, error);
+  //       if (attempt === retries - 1) throw error; // Rethrow if last attempt
+  //     }
+  //   }
+  // };
+
+  useEffect(() => {
+    console.log("Updated Generated Content:", generatedContent);
+  }, [generatedContent]);
 
   const handleGenerate = async () => {
     setCurrentProcessingStatus(ProcessingStatus.GenLoading);
@@ -249,14 +253,15 @@ function ControlPanel() {
             }
           }
         }
-       
+        
         setCurrentProcessingIndex((prevIndex) => {
           const newIndex = prevIndex + 1;
-
           return newIndex;
         });
       }
     }
+    console.log("Check my---------------------------------------")
+    console.log(generatedContent);
     setCurrentProcessingIndex(0);
     setCurrentProcessingStatus(ProcessingStatus.NoAction);
   };
@@ -315,11 +320,10 @@ function ControlPanel() {
         "App-Store-Build-Number": "1.1",
         "Auth-Token": authToken,
       };
-      const formData = new FormData();
-
+      
       if (generatedContent && generatedContent.length > 0) {
         for (const genContent of generatedContent) {
-          
+          const formData = new FormData();
           const imageBlob = await fetch(
             `data:image/png;base64,${genContent.imageUrl}`
           ).then((res) => res.blob());
